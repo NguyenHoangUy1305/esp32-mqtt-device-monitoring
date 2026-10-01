@@ -1,0 +1,40 @@
+name: Industrial MQTT CI & Docker Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  docker-and-config-check:
+    name: Docker Compose & Mosquitto Config Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          echo "Validating docker-compose.yml..."
+          docker compose -f docker/docker-compose.yml config
+          echo "Docker Compose syntax is valid!"
+
+      - name: Audit Mosquitto Configuration
+        run: |
+          echo "Checking mosquitto.conf..."
+          test -f docker/mosquitto/mosquitto.conf
+          echo "Mosquitto configuration file verified!"
+
+  firmware-layout-check:
+    name: Firmware Architecture Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Firmware Source Tree
+        run: |
+          test -d firmware/src
+          test -d docs
+          echo "Firmware source layout verified successfully!"

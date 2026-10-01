@@ -1,4 +1,7 @@
 # 📡 TRẠM GIÁM SÁT THIẾT BỊ CÔNG NGHIỆP QUA MQTT & STORE-AND-FORWARD
+
+[![CI](https://github.com/NguyenHoangUy1305/esp32-mqtt-device-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/NguyenHoangUy1305/esp32-mqtt-device-monitoring/actions/workflows/ci.yml)
+
 > **Tên đề tài:** Industrial IoT Device Monitoring Agent with High-Reliability Store-and-Forward Telemetry and Remote OTA  
 > **Thời gian:** Tháng 03/2027 - Tháng 04/2027 (4 tuần)  
 > **Mục tiêu:** Nắm vững giao thức MQTT chuẩn công nghiệp, thiết kế kiến trúc truyền dữ liệu tin cậy (High Availability) khi kết nối mạng chập chờn.
