@@ -1,69 +1,100 @@
-# 📡 TRẠM GIÁM SÁT THIẾT BỊ CÔNG NGHIỆP QUA MQTT & STORE-AND-FORWARD
+# 🏭 TRẠM GIÁM SÁT THIẾT BỊ CÔNG NGHIỆP QUA MQTT & STORE-AND-FORWARD
+## Industrial IoT Device Monitoring Agent with High-Reliability Store-and-Forward and OTA
 
 [![CI](https://github.com/NguyenHoangUy1305/esp32-mqtt-device-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/NguyenHoangUy1305/esp32-mqtt-device-monitoring/actions/workflows/ci.yml)
+[![Platform](https://img.shields.io/badge/Platform-ESP32%20%7C%20Mosquitto%20%7C%20Docker-blue.svg)](https://github.com/NguyenHoangUy1305/esp32-mqtt-device-monitoring)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Tên đề tài:** Industrial IoT Device Monitoring Agent with High-Reliability Store-and-Forward Telemetry and Remote OTA  
-> **Thời gian:** Tháng 03/2027 - Tháng 04/2027 (4 tuần)  
-> **Mục tiêu:** Nắm vững giao thức MQTT chuẩn công nghiệp, thiết kế kiến trúc truyền dữ liệu tin cậy (High Availability) khi kết nối mạng chập chờn.
+> **Tên đề tài:** Thiết kế trạm giám sát thiết bị công nghiệp sử dụng vi điều khiển ESP32 và giao thức MQTT, tích hợp cơ chế lưu đệm chống mất dữ liệu (Store-and-Forward) và cập nhật phần mềm từ xa (FOTA)  
+> **Tác giả:** Kỹ sư IoT & Hệ thống nhúng (NguyenHoangUy1305)  
+> **Thời gian:** Tháng 03/2027 - Tháng 04/2027  
+> **Trọng tâm:** Độ tin cậy cấp công nghiệp (High Reliability), giải quyết triệt để bài toán đứt mạng vô tuyến và vận hành liên tục 24/7.
 
 ---
 
-> 📘 **SỔ TAY KỸ THUẬT & LỘ TRÌNH 4 TUẦN CHI TIẾT:** Xem toàn bộ lý thuyết MQTT QoS, thuật toán Store-and-Forward trên Flash và OTA tại [`docs/ROADMAP_KY_THUAT.md`](./docs/ROADMAP_KY_THUAT.md)
+> 📘 **TÀI LIỆU KỸ THUẬT & LÝ THUYẾT ĐẦY ĐỦ:** Xem chi tiết toàn bộ lý thuyết MQTT, QoS 0/1/2, LWT, FOTA Dual Partition và sơ đồ kỹ thuật tại [`docs/SO_DO_KY_THUAT_VA_LY_THUYET.md`](./docs/SO_DO_KY_THUAT_VA_LY_THUYET.md).
 
+---
 
-## 1. CẤU TRÚC THƯ MỤC DỰ ÁN
-```text
-02-mqtt-device-monitoring/
-├── firmware/       # Mã nguồn C++ ESP32 sử dụng PubSubClient & LittleFS
-│   ├── src/        # MQTT manager, Sensor reader, Offline queue, OTA updater
-│   └── include/    # Cấu hình MQTT Broker, Topic list
-├── docker/         # Môi trường chạy Broker & Giám sát tập trung
-│   ├── docker-compose.yml  # Mosquitto Broker + Node-RED + Grafana
-│   └── mosquitto/  # File cấu hình mosquitto.conf, mật khẩu & ACL
-├── docs/           # Sơ đồ giải thuật Store-and-Forward, sơ đồ giao thức
-└── README.md       # Tài liệu đặc tả dự án
+## 1. SƠ ĐỒ KIẾN TRÚC HẠ TẦNG DOCKER & IOT
+
+```mermaid
+graph TB
+    subgraph Edge_Devices ["CÁC TRẠM GIÁM SÁT ĐẦU CUỐI (ESP32 EDGE)"]
+        Station["ESP32 Industrial Station"]
+        Station --- BME280["Cảm biến BME280 (Nhiệt độ/Độ ẩm/Áp suất)"]
+        Station --- OLED["Màn hình OLED SSD1306 (0.96 inch I2C)"]
+        Station --- Flash["Bộ nhớ Flash LittleFS (Ring Buffer lưu đệm)"]
+    end
+
+    subgraph Docker_Backend ["HẠ TẦNG MÁY CHỦ DOCKER CÔNG NGHIỆP"]
+        Broker["🐳 Eclipse Mosquitto MQTT Broker (Port 1883)"]
+        Telegraf["🐳 Telegraf Time-Series Collector"]
+        InfluxDB[("🐳 InfluxDB Time-Series Database")]
+        Grafana["🐳 Grafana Monitoring Dashboard (Port 3000)"]
+    end
+
+    Station -->|"MQTT QoS 1 Telemetry & LWT Di chúc"| Broker
+    Broker --> Telegraf
+    Telegraf --> InfluxDB
+    InfluxDB --> Grafana
+    Grafana -->|"Cảnh báo Telegram khi vượt ngưỡng"| Engineer["📱 Kỹ sư vận hành"]
 ```
 
 ---
 
-## 2. PHẦN CỨNG & CẢM BIẾN SỬ DỤNG
-* **ESP32 DevKit V1**: Vi điều khiển kết nối Wi-Fi.
-* **Cảm biến BME280 (I2C)**: Đo nhiệt độ, độ ẩm và áp suất khí quyển độ chính xác cao.
-* **Màn hình OLED 0.96 inch (SSD1306 - I2C)**: Hiển thị địa chỉ IP, trạng thái MQTT, chỉ số cảm biến.
-* **Bus I2C kết nối chung chân:**
-  * `SDA` -> **GPIO 21**
-  * `SCL` -> **GPIO 22**
+## 2. BẢNG ĐẤU NỐI CHÂN PHẦN CỨNG (PINOUT)
+
+| Module / Thiết bị | Chân Module | Chân kết nối ESP32 | Điện áp | Chức năng kỹ thuật |
+| :--- | :--- | :--- | :--- | :--- |
+| **Cảm biến BME280** | **VCC** | **3V3** | 3.3V DC | Cấp nguồn cảm biến môi trường |
+| | **GND** | **GND** | 0V | Nối mass chung |
+| | **SCL** | **GPIO 22** | 3.3V (Kéo $4.7\text{k}\Omega$) | Bus $I^2C$ Clock |
+| | **SDA** | **GPIO 21** | 3.3V (Kéo $4.7\text{k}\Omega$) | Bus $I^2C$ Data |
+| **Màn hình OLED 0.96**| **VCC** | **3V3** | 3.3V DC | Cấp nguồn OLED SSD1306 |
+| | **SCL / SDA** | **GPIO 22 / 21**| 3.3V (Dùng chung bus) | Hiển thị thông số thời gian thực |
+| **Relay Cảnh Báo** | **VCC / IN** | **5V / GPIO 18** | 5V DC / 3.3V Logic | Kích hoạt còi/quạt công nghiệp |
+| **Nút Nhấn Config** | **Chân 1** | **GPIO 0** | PULLUP nội | Nút đa năng chuyển chế độ AP cấu hình |
+| **LED Báo Mạng** | **Anode (+)** | **GPIO 2** | 3.3V qua $220\Omega$ | Báo trạng thái kết nối MQTT Broker |
 
 ---
 
-## 3. ĐẶC TẢ KIẾN TRÚC MQTT & DANH MỤC TOPIC
+## 3. CƠ CHẾ LƯU ĐỆM CHỐNG MẤT DỮ LIỆU (STORE-AND-FORWARD)
 
-### 3.1. Các thông số kết nối
-* **Broker:** Eclipse Mosquitto (triển khai trên Docker / Local PC port 1883).
-* **QoS Level:** QoS 1 (At least once) cho dữ liệu quan trọng, QoS 0 cho telemetry định kỳ.
-* **Last Will and Testament (LWT):** Tự động phát thông điệp thiết bị offline nếu ESP32 mất nguồn hoặc đứt mạng đột ngột.
+```mermaid
+stateDiagram-v2
+    [*] --> STATE_ONLINE: Kết nối MQTT Broker thành công
+    STATE_ONLINE --> STATE_STORE_FORWARD: Mất kết nối mạng (Wi-Fi drop / Broker timeout)
 
-### 3.2. Cấu trúc Topic
-| Chiều giao tiếp | Tên Topic | Nội dung Payload (JSON) | Mục đích |
-| :--- | :--- | :--- | :--- |
-| ESP32 -> Broker | `devices/ESP32_01/telemetry` | `{"temp": 28.5, "hum": 65.2, "press": 1013, "ts": 1711234567}` | Dữ liệu định kỳ 5s |
-| ESP32 -> Broker | `devices/ESP32_01/status` | `{"status": "online", "ip": "192.168.1.50"}` (Retained) | Trạng thái sống còn |
-| ESP32 -> Broker | `devices/ESP32_01/status` | `{"status": "offline", "reason": "unexpected"}` (LWT) | Báo mất kết nối tức thì |
-| Broker -> ESP32 | `devices/ESP32_01/commands` | `{"command": "REBOOT"}` hoặc `{"command": "SET_SAMPLE_RATE", "val": 2}` | Điều khiển từ xa |
+    state STATE_STORE_FORWARD {
+        [*] --> Đọc_Cảm_Biến
+        Đọc_Cảm_Biến --> Lưu_Vào_Flash_LittleFS
+        Lưu_Vào_Flash_LittleFS --> Thử_Kết_Nối_Lại
+    }
 
----
+    STATE_STORE_FORWARD --> STATE_DRAINING: Mạng phục hồi thành công!
 
-## 4. TÍNH NĂNG ĐỘC ĐÁO: STORE-AND-FORWARD BỀN VỮNG
-* Khi mất mạng Wi-Fi hoặc MQTT Broker không phản hồi:
-  1. ESP32 tự động chuyển sang chế độ **BUFFERING**.
-  2. Gói tin JSON được ghi nối tiếp vào file hàng đợi trên bộ nhớ Flash vi điều khiển (`LittleFS`).
-  3. Áp dụng cơ chế **Circular Buffer** (giới hạn tối đa 500 bản ghi, tự ghi đè bản ghi cũ nhất khi Flash đầy để tránh tràn bộ nhớ).
-* Khi mạng khôi phục:
-  1. ESP32 kết nối lại Wi-Fi và Broker.
-  2. Đọc từng bản ghi trong Flash, publish bù lên topic `devices/ESP32_01/offline_sync` giữ nguyên mốc thời gian gốc.
-  3. Xóa dữ liệu tạm sau khi Broker xác nhận đã nhận (`PUBACK`).
+    state STATE_DRAINING {
+        [*] --> Đọc_Bản_Ghi_FIFO_Flash
+        Đọc_Bản_Ghi_FIFO_Flash --> Publish_Kèm_Timestamp_Gốc
+        Publish_Kèm_Timestamp_Gốc --> Xóa_Bản_Ghi_Khi_Nhận_PUBACK
+    }
+
+    STATE_DRAINING --> STATE_ONLINE: Đã xả hết sạch bộ đệm Flash
+```
 
 ---
 
-## 5. NÂNG CẤP FIRMWARE TỪ XA (OVER-THE-AIR - OTA)
-* Tích hợp tính năng ArduinoOTA / Web OTA cho phép cập nhật code mới cho ESP32 qua mạng nội bộ mà không cần cắm cáp nạp.
+## 4. HƯỚNG DẪN KHỞI CHẠY NHANH (QUICK START)
+```bash
+# 1. Khởi chạy cụm dịch vụ Docker (Mosquitto + InfluxDB + Grafana)
+cd docker
+docker-compose up -d
+
+# 2. Kiểm tra log của Mosquitto Broker
+docker-compose logs -f mosquitto
+
+# 3. Biên dịch và nạp Firmware ESP32
+cd ../firmware
+pio run --target upload
+```
