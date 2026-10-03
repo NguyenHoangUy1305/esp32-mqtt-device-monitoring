@@ -2,7 +2,7 @@
 ## Đề tài: Trạm giám sát thiết bị công nghiệp qua MQTT & Store-and-Forward (ESP32 + Mosquitto + Docker)
 
 > **Người thực hiện:** Kỹ sư IoT / Embedded  
-> **Thời gian:** 4 tuần (Tháng 03/2027 - Tháng 04/2027)  
+> **Thời gian:** 6 tuần (Tháng 02/2027 - Tháng 04/2027, bắt đầu sau Tết Nguyên Đán: 15/02/2027)  
 > **Ghi chú tác giả:** Dự án tập trung vào độ tin cậy cấp công nghiệp (High Reliability), giải quyết triệt để bài toán mất kết nối mạng và nạp phần mềm từ xa không cần cắm dây (OTA).
 
 ---

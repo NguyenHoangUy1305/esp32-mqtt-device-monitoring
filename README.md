@@ -7,7 +7,7 @@
 
 > **Tên đề tài:** Thiết kế trạm giám sát thiết bị công nghiệp sử dụng vi điều khiển ESP32 và giao thức MQTT, tích hợp cơ chế lưu đệm chống mất dữ liệu (Store-and-Forward) và cập nhật phần mềm từ xa (FOTA)  
 > **Tác giả:** Kỹ sư IoT & Hệ thống nhúng (NguyenHoangUy1305)  
-> **Thời gian:** Tháng 03/2027 - Tháng 04/2027  
+> **Thời gian:** Tháng 02/2027 - Tháng 04/2027 (Khởi động sau Tết: 15/02/2027)  
 > **Trọng tâm:** Độ tin cậy cấp công nghiệp (High Reliability), giải quyết triệt để bài toán đứt mạng vô tuyến và vận hành liên tục 24/7.
 
 ---
