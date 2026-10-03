@@ -3,25 +3,27 @@
 
 > **Tác giả:** Kỹ sư IoT & Hệ thống nhúng (NguyenHoangUy1305)  
 > **Repository:** [NguyenHoangUy1305/esp32-mqtt-device-monitoring](https://github.com/NguyenHoangUy1305/esp32-mqtt-device-monitoring)  
-> **Mục đích:** Tài liệu này cung cấp toàn bộ cơ sở lý thuyết chuyên sâu về giao thức MQTT chuẩn công nghiệp, cơ chế lưu đệm Store-and-Forward chống mất mát dữ liệu khi đứt mạng, kiến trúc nạp firmware từ xa không dây (OTA), sơ đồ nối dây phần cứng và quy trình thực hiện dự án.
+> **Thời gian thực hiện:** Tháng 02/2027 - Tháng 04/2027 (Khởi động: 15/02/2027)  
+> **Mục đích:** Cung cấp toàn bộ nền tảng lý thuyết chuyên sâu về chuẩn giao thức MQTT công nghiệp, phân tích toán học các cấp độ QoS, giải pháp lưu đệm Store-and-Forward chống mất mát dữ liệu trên Flash, kiến trúc nâng cấp firmware từ xa không dây FOTA và sơ đồ nguyên lý mạch điện phần cứng.
 
 ---
 
 ## MỤC LỤC
 1. [PHẦN 1: CƠ SỞ LÝ THUYẾT & NGUYÊN LÝ HOẠT ĐỘNG CHUYÊN SÂU](#phần-1-cơ-sở-lý-thuyết--nguyên-lý-hoạt-động-chuyên-sâu)
-   - 1.1 Giao thức MQTT (OASIS Standard) & Mô hình Pub/Sub tách ghép
-   - 1.2 Cấu trúc gói tin nhị phân MQTT & So sánh hiệu năng với HTTP
-   - 1.3 Phân tích chuyên sâu 3 cấp độ QoS (Quality of Service)
-   - 1.4 Cơ chế Keep-Alive & Khắc phục kết nối TCP Half-Open
-   - 1.5 Cơ chế Di chúc số (Last Will and Testament - LWT)
-   - 1.6 Khái niệm Retained Message & Persistent Session
-   - 1.7 Cơ chế lưu đệm công nghiệp Store-and-Forward
-   - 1.8 Bus truyền thông I2C & Thuật toán đọc cảm biến BME280
-   - 1.9 Cơ chế nạp Firmware từ xa FOTA & Cấu trúc phân vùng Dual Partition
+   - 1.1 Chuẩn giao thức MQTT 3.1.1 / 5.0 & Mô hình Pub/Sub tách ghép 3 chiều
+   - 1.2 Cấu trúc khung gói tin nhị phân MQTT & Thuật toán Variable Byte Integer
+   - 1.3 So sánh định lượng hiệu năng: MQTT vs HTTP/REST trong môi trường nhúng
+   - 1.4 Phân tích toán học & Kỹ thuật 3 cấp độ QoS (Quality of Service)
+   - 1.5 Hiện tượng TCP Socket Half-Open & Cơ chế nhịp tim Keep-Alive
+   - 1.6 Cơ chế Di chúc số (Last Will and Testament - LWT)
+   - 1.7 Khái niệm Retained Message & Phiên kết nối bền vững (Persistent Session)
+   - 1.8 Thuật toán lưu đệm công nghiệp Store-and-Forward & Dynamic Wear Leveling trên Flash LittleFS
+   - 1.9 Bus giao tiếp I2C, Mạch cực thu hở (Open-Drain) & Thuật toán bù trừ cảm biến BME280
+   - 1.10 Kiến trúc nâng cấp Firmware từ xa FOTA Dual Partition & Cơ chế Anti-Bricking Rollback
 2. [PHẦN 2: SƠ ĐỒ KỸ THUẬT & SƠ ĐỒ ĐẤU NỐI MẠCH (PINOUT)](#phần-2-sơ-đồ-kỹ-thuật--sơ-đồ-đấu-nối-mạch-pinout)
    - 2.1 Bảng ánh xạ chân GPIO chi tiết (Hardware Pinout Matrix)
    - 2.2 Sơ đồ nguyên lý mạch điện phần cứng (Hardware Schematics)
-   - 2.3 Sơ đồ kiến trúc hạ tầng Docker & Broker công nghiệp
+   - 2.3 Sơ đồ kiến trúc hạ tầng Docker Mosquitto Broker + InfluxDB + Grafana
 3. [PHẦN 3: SƠ ĐỒ LÀM & SƠ ĐỒ QUY TRÌNH THỰC HIỆN DỰ ÁN](#phần-3-sơ-đồ-làm--sơ-đồ-quy-trình-thực-hiện-dự-án)
    - 3.1 Quy trình 4 bước triển khai thực chiến
    - 3.2 Sơ đồ máy trạng thái kết nối MQTT & Xử lý lưu đệm (State Machine)
@@ -31,39 +33,52 @@
 
 # PHẦN 1: CƠ SỞ LÝ THUYẾT & NGUYÊN LÝ HOẠT ĐỘNG CHUYÊN SÂU
 
-### 1.1. Giao thức MQTT (OASIS Standard) & Mô hình Pub/Sub tách ghép
-MQTT (**Message Queuing Telemetry Transport**) là giao thức truyền thông theo mô hình **Publish / Subscribe** chạy trên nền tảng mạng TCP/IP, được thiết kế tối ưu riêng cho các thiết bị nhúng có tài nguyên bộ nhớ hạn chế và hoạt động trong môi trường mạng vô tuyến băng thông thấp, độ trễ cao hoặc chập chờn.
+### 1.1. Chuẩn giao thức MQTT 3.1.1 / 5.0 & Mô hình Pub/Sub tách ghép 3 chiều
+MQTT (**Message Queuing Telemetry Transport**) là giao thức truyền thông theo mô hình **Publish / Subscribe** chạy trên nền tảng mạng TCP/IP, được phát minh bởi Andy Stanford-Clark (IBM) và Arlen Nipper vào năm 1999 nhằm theo dõi các đường ống dẫn dầu qua vệ tinh.
 
 * **Tính chất tách ghép 3 chiều vượt trội:**
-  1. **Tách ghép không gian (Space Decoupling):** Thiết bị phát dữ liệu (Publisher - ESP32) và thiết bị nhận (Subscriber - Dashboard/Database) không cần biết địa chỉ IP hay port của nhau, chỉ cần kết nối tới cùng một **MQTT Broker** trung tâm.
-  2. **Tách ghép thời gian (Time Decoupling):** Thiết bị gửi và thiết bị nhận không cần phải online cùng một thời điểm (khi kết hợp với Persistent Session và Retained Message).
-  3. **Tách ghép đồng bộ (Synchronization Decoupling):** Quá trình gửi và nhận diễn ra bất đồng bộ, luồng xử lý chính của vi điều khiển không bị chặn lại khi chờ ứng dụng đầu cuối đọc tin.
+  1. **Tách ghép không gian (Space Decoupling):** Thiết bị phát (Publisher - ESP32) và thiết bị nhận (Subscriber - Dashboard Grafana/Database) không cần biết địa chỉ IP hay port của nhau, chỉ cần kết nối tới cùng một **MQTT Broker** trung tâm.
+  2. **Tách ghép thời gian (Time Decoupling):** Hai bên không cần online cùng một thời điểm. Khi kết hợp với Persistent Session và Retained Message, Broker sẽ lưu trữ tin nhắn chờ đến khi Client bật nguồn trở lại.
+  3. **Tách ghép đồng bộ (Synchronization Decoupling):** Quá trình gửi và nhận hoàn toàn bất đồng bộ. Luồng xử lý chính của vi điều khiển không bị chặn lại khi chờ ứng dụng đầu cuối đọc tin.
 
 ---
 
-### 1.2. Cấu trúc gói tin nhị phân MQTT & So sánh hiệu năng với HTTP
+### 1.2. Cấu trúc khung gói tin nhị phân MQTT & Thuật toán Variable Byte Integer
 
 ```text
 +-----------------------+-----------------------+-------------------------------+
-| Fixed Header (2 Bytes)| Variable Header (Opt) | Payload (Dữ liệu thực tế)     |
+| Fixed Header (2-5 B)  | Variable Header (Opt) | Payload (Dữ liệu thực tế)     |
 +-----------------------+-----------------------+-------------------------------+
 | Byte 1: Type & Flags  | Packet Identifier,    | JSON / Binary Telemetry Data  |
-| Byte 2: Remaining Len | Topic Name, Properties| {"temp": 28.5, "hum": 65.2}   |
+| Byte 2+: Remaining Len| Topic Name, Properties| {"temp": 28.5, "hum": 65.2}   |
 +-----------------------+-----------------------+-------------------------------+
 ```
 
-* **So sánh kỹ thuật giữa HTTP/REST và MQTT:**
-
-| Tiêu chí kỹ thuật | HTTP / REST API | MQTT 3.1.1 / 5.0 | Đánh giá cho IoT Công Nghiệp |
-| :--- | :--- | :--- | :--- |
-| **Kích thước Header tối thiểu** | $200 \sim 800\text{ bytes}$ (Headers, User-Agent, Cookies) | **Chỉ $2\text{ bytes}$** | MQTT tiết kiệm tới **99% băng thông mạng** |
-| **Duy trì kết nối** | Đóng socket sau mỗi request (hoặc Keep-Alive ngắn) | Duy trì **1 kết nối TCP duy nhất** | Giảm thiểu số lần bắt tay 3 bước TCP 3-way handshake |
-| **Tiêu thụ điện năng vi điều khiển** | Cao (Liên tục mở kết nối SSL/TLS mới) | Cực thấp (Chỉ gửi frame nhị phân nhỏ) | Kéo dài tuổi thọ nguồn pin/ắc-quy |
-| **Bản chất truyền tin** | Kéo dữ liệu (Pull / Polling) | Đẩy dữ liệu thời gian thực (Push) | Cảnh báo sự cố tức thì trong $< 20\text{ ms}$ |
+* **Fixed Header (Cố định):**
+  - **Byte 1:** Chia làm 2 nửa:
+    - 4 bits cao: `Packet Type` (1 = `CONNECT`, 2 = `CONNACK`, 3 = `PUBLISH`, 4 = `PUBACK`, 12 = `PINGREQ`, 13 = `PINGRESP`, 14 = `DISCONNECT`).
+    - 4 bits thấp: `Flags` dành riêng (ví dụ gói `PUBLISH`: Bit 3 là `DUP`, Bit 2-1 là `QoS`, Bit 0 là `RETAIN`).
+  - **Byte 2+:** `Remaining Length` (Độ dài còn lại của gói tin).
+* **Thuật toán Variable Byte Integer:**
+  Độ dài gói tin được mã hóa bằng thuật toán biến thiên từ 1 đến 4 bytes. Mỗi byte chỉ dùng 7 bits thấp để chứa dữ liệu, bit thứ 8 là cờ tiếp tục (`Continuation Bit`). Nhờ đó, một gói tin nhỏ chỉ tốn đúng **1 byte** để báo độ dài, nhưng thuật toán có thể biểu diễn kích thước gói tin khổng lồ lên tới:
+  $$	ext{Max Size} = 128^4 - 1 = 268.435.455	ext{ bytes} pprox 256	ext{ MB}!$$
 
 ---
 
-### 1.3. Phân tích chuyên sâu 3 cấp độ QoS (Quality of Service)
+### 1.3. So sánh định lượng hiệu năng: MQTT vs HTTP/REST trong môi trường nhúng
+
+| Tiêu chí kỹ thuật | Giao thức HTTP/1.1 REST | Chuẩn MQTT 3.1.1 / 5.0 | Đánh giá kỹ thuật IoT |
+| :--- | :--- | :--- | :--- |
+| **Kích thước Header tối thiểu** | $200 \sim 800	ext{ bytes}$ (User-Agent, Host, Cookie) | **Chỉ $2	ext{ bytes}$** | MQTT tiết kiệm tới **$99\%$ băng thông mạng** |
+| **Duy trì kết nối** | Đóng socket sau mỗi request (hoặc Keep-Alive ngắn) | Duy trì **1 kết nối TCP duy nhất** | Giảm thiểu số lần bắt tay 3 bước TCP 3-way handshake |
+| **Tiêu thụ điện năng vi điều khiển** | Rất cao (Liên tục mở kết nối SSL/TLS mới) | Cực thấp (Chỉ gửi frame nhị phân nhỏ) | Kéo dài tuổi thọ nguồn pin/ắc-quy |
+| **Bản chất truyền tin** | Kéo dữ liệu (Pull / Polling) | Đẩy dữ liệu thời gian thực (Push) | Cảnh báo sự cố tức thì trong $< 20	ext{ ms}$ |
+| **Mô hình kiến trúc** | Điểm - Điểm (Client - Server) | Trung tâm phát tán (Pub / Sub) | Mở rộng hàng ngàn trạm mà không bị nghẽn |
+
+---
+
+### 1.4. Phân tích toán học & Kỹ thuật 3 cấp độ QoS (Quality of Service)
+
 * **QoS 0 (At most once - Tối đa một lần):**
   - Cơ chế: "Bắn rồi quên" (Fire and Forget). Gói tin gửi đi một chiều từ Client tới Broker mà không yêu cầu phản hồi xác nhận.
   - Ứng dụng: Dữ liệu đo đạc nhiệt độ/độ ẩm định kỳ mỗi 5 giây. Nếu mất một gói tin, gói tiếp theo sau 5 giây sẽ bù đắp mà không gây tổn hại cho hệ thống.
@@ -81,17 +96,17 @@ MQTT (**Message Queuing Telemetry Transport**) là giao thức truyền thông t
 
 ---
 
-### 1.4. Cơ chế Keep-Alive & Khắc phục kết nối TCP Half-Open
+### 1.5. Hiện tượng TCP Socket Half-Open & Cơ chế nhịp tim Keep-Alive
 Trong môi trường công nghiệp có nhiều nhiễu sóng hoặc đường truyền 4G không ổn định, một socket TCP có thể bị đứt ngầm mà hệ điều hành không hề nhận được gói tin ngắt `FIN` hay `RST` (gọi là hiện tượng **TCP Half-Open Socket**).
 * **Giải pháp MQTT Keep-Alive:**
   - Client cấu hình khoảng thời gian `KeepAlive = 30` giây.
   - Nếu trong vòng 30 giây không có dữ liệu cảm biến nào cần gửi, ESP32 sẽ chủ động gửi một gói tin nhịp tim siêu nhẹ (**PINGREQ** - 2 bytes).
   - Broker nhận được và lập tức phản hồi gói (**PINGRESP** - 2 bytes).
-  - Nếu quá $1.5 \times \text{KeepAlive}$ (tức 45 giây) mà Broker không nhận được gói tin nào từ Client, Broker sẽ chủ động đóng kết nối và công bố sự cố!
+  - Nếu quá $1.5 	imes 	ext{KeepAlive}$ (tức 45 giây) mà Broker không nhận được gói tin nào từ Client, Broker sẽ chủ động đóng kết nối và công bố sự cố!
 
 ---
 
-### 1.5. Cơ chế Di chúc số (Last Will and Testament - LWT)
+### 1.6. Cơ chế Di chúc số (Last Will and Testament - LWT)
 * Khi ESP32 thiết lập kết nối (`CONNECT`) tới Mosquitto Broker, nó đính kèm một "bản di chúc" đăng ký trước:
   - **LWT Topic:** `factory/station_01/status`
   - **LWT Payload:** `{"status": "OFFLINE", "reason": "unexpected_power_loss"}`
@@ -102,7 +117,7 @@ Trong môi trường công nghiệp có nhiều nhiễu sóng hoặc đường t
 
 ---
 
-### 1.6. Khái niệm Retained Message & Persistent Session
+### 1.7. Khái niệm Retained Message & Phiên kết nối bền vững (Persistent Session)
 * **Retained Message:**
   Khi publish một tin nhắn kèm cờ `Retain = true`, Broker sẽ lưu trữ tin nhắn này lại trong bộ nhớ của nó như là trạng thái gần nhất (**Last Known Good Value**). Bất kỳ Dashboard hoặc ứng dụng nào vừa bật lên và subscribe vào topic này sẽ nhận được giá trị đó ngay tức thì mà không cần phải chờ tới chu kỳ lấy mẫu tiếp theo của cảm biến.
 * **Persistent Session (CleanSession = false):**
@@ -110,10 +125,10 @@ Trong môi trường công nghiệp có nhiều nhiễu sóng hoặc đường t
 
 ---
 
-### 1.7. Cơ chế lưu đệm công nghiệp Store-and-Forward
+### 1.8. Thuật toán lưu đệm công nghiệp Store-and-Forward & Dynamic Wear Leveling trên Flash LittleFS
 Một trạm giám sát công nghiệp đạt chuẩn không bao giờ được phép làm mất dữ liệu cảm biến khi mạng Internet bị đứt:
-* **Kiến trúc Circular Ring Buffer trên bộ nhớ Flash (LittleFS/NVS):**
-  - ESP32 được cấu hình vùng nhớ Flash riêng $512\text{ KB}$ làm kho lưu trữ đệm.
+* **Kiến trúc Circular Ring Buffer trên bộ nhớ Flash (LittleFS):**
+  - ESP32 được cấu hình vùng nhớ Flash riêng $512	ext{ KB}$ làm kho lưu trữ đệm.
   - Khi `mqttClient.connected() == false`, luồng đo cảm biến vẫn tiếp tục lấy mẫu định kỳ đúng chu kỳ, đóng gói thành chuỗi JSON nén kèm dấu thời gian thực (**Timestamp từ RTC hoặc chu kỳ SNTP**) và ghi tuần tự vào Flash.
 * **Cơ chế Drainer (Bơm xả bù dữ liệu khi mạng phục hồi):**
   - Khi Wi-Fi và MQTT kết nối lại thành công, một Task chạy nền sẽ kích hoạt tiến trình xả đệm (**Buffer Drainer**).
@@ -122,17 +137,17 @@ Một trạm giám sát công nghiệp đạt chuẩn không bao giờ được 
 
 ---
 
-### 1.8. Bus truyền thông I2C & Cảm biến môi trường BME280
+### 1.9. Bus giao tiếp I2C, Mạch cực thu hở (Open-Drain) & Thuật toán bù trừ cảm biến BME280
 Cảm biến BME280 của Bosch Sensortec đo đồng thời 3 thông số: Nhiệt độ, Độ ẩm và Áp suất khí quyển.
 * **Giao tiếp $I^2C$ (Inter-Integrated Circuit):**
-  - Sử dụng 2 dây cực thu hở (Open-Drain): `SDA` (GPIO 21) và `SCL` (GPIO 22). Bắt buộc phải có 2 điện trở kéo lên nguồn $3.3\text{V}$ (Pull-up Resistors $4.7\text{ k}\Omega$).
+  - Sử dụng 2 dây cực thu hở (Open-Drain): `SDA` (GPIO 21) và `SCL` (GPIO 22). Bắt buộc phải có 2 điện trở kéo lên nguồn $3.3	ext{V}$ (Pull-up Resistors $4.7	ext{ k}\Omega$).
   - Địa chỉ thiết bị mặc định: `0x76` (hoặc `0x77` khi nối chân SDO lên VCC).
 * **Thuật toán bù trừ chính xác cao (Factory Calibration Compensation):**
-  BME280 không trả về giá trị độ C trực tiếp mà trả về giá trị số ADC thô 20-bit. ESP32 phải đọc 24 thanh ghi hiệu chuẩn xuất xưởng (`calib_data`) từ ROM của cảm biến và áp dụng các công thức toán học số nguyên 32-bit của Bosch để bù trừ nhiệt độ nội vi và phi tuyến tính, đạt độ chính xác tới $\pm 0.5^\circ\text{C}$ và $\pm 3\%\text{ RH}$.
+  BME280 không trả về giá trị độ C trực tiếp mà trả về giá trị số ADC thô 20-bit. ESP32 phải đọc 24 thanh ghi hiệu chuẩn xuất xưởng (`calib_data`) từ ROM của cảm biến và áp dụng các công thức toán học số nguyên 32-bit của Bosch để bù trừ nhiệt độ nội vi và phi tuyến tính, đạt độ chính xác tới $\pm 0.5^\circ	ext{C}$ và $\pm 3\%	ext{ RH}$.
 
 ---
 
-### 1.9. Cơ chế nạp Firmware từ xa FOTA & Cấu trúc phân vùng Dual Partition
+### 1.10. Kiến trúc nâng cấp Firmware từ xa FOTA Dual Partition & Cơ chế Anti-Bricking Rollback
 Hệ thống cho phép nâng cấp phần mềm mà không cần cắm cáp USB (Firmware Over-The-Air - FOTA) qua HTTP/MQTT.
 
 ```text
@@ -162,8 +177,8 @@ SƠ ĐỒ BẢN ĐỒ BỘ NHỚ FLASH ESP32 (4MB):
 | :--- | :--- | :--- | :--- | :--- |
 | **Cảm biến BME280** | **VCC** | **3V3** | 3.3V DC | Cấp nguồn cho cảm biến môi trường |
 | | **GND** | **GND** | 0V | Nối mass chung |
-| | **SCL** | **GPIO 22** | 3.3V (Kéo $4.7\text{k}\Omega$) | $I^2C$ Clock |
-| | **SDA** | **GPIO 21** | 3.3V (Kéo $4.7\text{k}\Omega$) | $I^2C$ Data |
+| | **SCL** | **GPIO 22** | 3.3V (Kéo $4.7	ext{k}\Omega$) | $I^2C$ Clock |
+| | **SDA** | **GPIO 21** | 3.3V (Kéo $4.7	ext{k}\Omega$) | $I^2C$ Data |
 | **Màn hình OLED 0.96**| **VCC** | **3V3** | 3.3V DC | Cấp nguồn OLED SSD1306 |
 | | **GND** | **GND** | 0V | Nối mass chung |
 | | **SCL** | **GPIO 22** | 3.3V (Dùng chung bus) | $I^2C$ Clock |
@@ -209,7 +224,7 @@ SƠ ĐỒ BẢN ĐỒ BỘ NHỚ FLASH ESP32 (4MB):
 
 ---
 
-### 2.3. Sơ đồ kiến trúc hạ tầng Docker & Broker công nghiệp
+### 2.3. Sơ đồ kiến trúc hạ tầng Docker Mosquitto Broker + InfluxDB + Grafana
 
 ```mermaid
 graph TB
